@@ -218,7 +218,7 @@ class ASRTrainer(BaseTrainer):
         # TODO: In-fill the _validate_epoch method
 
         # TODO: Call recognize
-        results = self.scaler.scale(loss).backward()
+        results = self.recognize(dataloader)
         
         # TODO: Extract references and hypotheses from results
         references = [r['target'] for r in results]
