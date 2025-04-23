@@ -72,7 +72,11 @@ class LMDataset(Dataset):
         ])
 
         # TODO: Take subset
-        subset_size = int(config.get('subset', None))
+        subset = config.get('subset', 1.0)  # default to 1.0 (100%) if missing
+        if 0 < subset <= 1.0:
+            subset_size = int(subset * len(self.text_files))
+        else:
+            subset_size = len(self.text_files)  # fallback to full dataset
         self.text_files = self.text_files[:subset_size]
 
         # Initialize lists to store transcripts
