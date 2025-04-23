@@ -219,7 +219,64 @@ class SequenceGenerator:
             raise ValueError("max_length must be >= input sequence length")
         
         # TODO: Implement beam search
-        raise NotImplementedError # Remove once implemented
+
+        batch_size, seq_len = x.shape
+        vocab_size = self.tokenizer.vocab_size
+        eos_id = self.tokenizer.eos_id
+
+        logits = self.score_fn(x)
+        logits = self._apply_repeat_penalty(logits, x,repeat_penalty)
+        logits = logits/temperature
+
+        log_probs = torch.log_softmax(logits, dim=-1)
+        topk_log_probs, topk_tokens = torch.topk(log_probs, beam_width, dim=-1) 
+        scores = topk_log_probs
+
+        beams = x.unsqueeze(1).expand(batch_size, beam_width, seq_len).clone() 
+        beams = torch.cat([beams, topk_tokens.unsqueeze(-1)], dim=-1)
+
+        finished = topk_tokens.eq(eos_id)
+
+        for t in range(seq_len + 1, self.max_length):
+            if finished.all():
+                break
+
+            next_logits = []
+
+            for w in range(beam_width):
+
+                logits = self.score_fn(beams[:, w, :].squeeze(1))
+                next_logits.append(logits)
+
+           
+            next_logits = torch.stack(next_logits, dim=1)
+            next_logits = self._apply_repeat_penalty(next_logits, beams, repeat_penalty)
+            next_logits = next_logits /temperature
+            log_probs = torch.log_softmax(next_logits, dim=-1)
+
+            total_scores = scores.unsqueeze(-1) + log_probs 
+            total_scores = total_scores.view(batch_size, -1)
+
+            topk_scores, topk_indices = torch.topk(total_scores, beam_width, dim=-1)
+
+            beam_indices = topk_indices // vocab_size 
+            token_indices = topk_indices % vocab_size
+
+            batch_indices = torch.arange(batch_size, device=x.device).unsqueeze(1) 
+            selected_beams = beams[batch_indices, beam_indices]
+            beams = torch.cat([selected_beams, token_indices.unsqueeze(-1)], dim=-1)
+
+            newly_finished = token_indices.eq(eos_id)
+            finished = finished.gather(1, beam_indices) | newly_finished
+            scores = topk_scores
+
+        sorted_scores, sorted_indices = torch.sort(scores, dim=-1, descending=True)
+        sorted_beams = beams.gather(
+            1,
+            sorted_indices.unsqueeze(-1).expand(-1, -1, beams.size(-1))
+        )
+
+        return sorted_beams, sorted_scores
 
     def generate_sample(
             self,
