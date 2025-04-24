@@ -99,7 +99,7 @@ class ASRDataset(Dataset):
         # TODO: Take subset
         subset_frac = config.get('subset', 1.0)
         subset_size = int(len(self.fbank_files) * subset_frac)
-        
+
         self.fbank_files = self.fbank_files[:subset_size]
         
         # TODO: Get the number of samples in the dataset  
@@ -178,7 +178,7 @@ class ASRDataset(Dataset):
             if self.partition != "test-clean":
                 # TODO: Load the transcript
                 # Note: Use np.load to load the numpy array and convert to list and then join to string 
-                transcript = " ".join(np.load(os.path.join(self.text_dir, self.text_files[i])).tolist())
+                transcript = "".join(np.load(os.path.join(self.text_dir, self.text_files[i])).tolist())
 
                 # TODO: Track character count (before tokenization)
                 self.total_chars += len(transcript)
